@@ -1,0 +1,124 @@
+import { supabase } from './supabase';
+import { Groq } from 'groq-sdk';
+
+interface GroqConfig {
+  apiKey: string;
+  model: string;
+}
+
+/**
+ * Get Groq configuration for a user
+ * @param userId User ID to get configuration for
+ * @returns Groq configuration object
+ */
+export async function getGroqConfig(userId?: string): Promise<GroqConfig> {
+  try {
+    if (!userId) {
+      throw new Error('User ID is required to get Groq configuration');
+    }
+
+    // Get user's Groq configuration from database
+    const { data, error } = await supabase
+      .from('user_groq_config')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching Groq configuration:', error);
+      throw error;
+    }
+
+    // If configuration exists, return it
+    if (data) {
+      return {
+        apiKey: data.api_key,
+        model: data.model || 'mixtral-8x7b-32768'
+      };
+    }
+
+    // If no configuration exists, throw error
+    throw new Error('No Groq configuration found for this user');
+  } catch (error) {
+    console.error('Error in getGroqConfig:', error);
+    throw error;
+  }
+}
+
+/**
+ * Save Groq configuration for a user
+ * @param userId User ID to save configuration for
+ * @param config Groq configuration object
+ */
+export async function saveGroqConfig(userId: string, config: GroqConfig): Promise<void> {
+  try {
+    if (!userId) {
+      throw new Error('User ID is required to save Groq configuration');
+    }
+
+    // Check if configuration already exists
+    const { data: existingConfig, error: checkError } = await supabase
+      .from('user_groq_config')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (checkError) {
+      console.error('Error checking existing Groq configuration:', checkError);
+      throw checkError;
+    }
+
+    if (existingConfig) {
+      // Update existing configuration
+      const { error: updateError } = await supabase
+        .from('user_groq_config')
+        .update({
+          api_key: config.apiKey,
+          model: config.model,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingConfig.id);
+
+      if (updateError) {
+        console.error('Error updating Groq configuration:', updateError);
+        throw updateError;
+      }
+    } else {
+      // Insert new configuration
+      const { error: insertError } = await supabase
+        .from('user_groq_config')
+        .insert([{
+          user_id: userId,
+          api_key: config.apiKey,
+          model: config.model
+        }]);
+
+      if (insertError) {
+        console.error('Error inserting Groq configuration:', insertError);
+        throw insertError;
+      }
+    }
+  } catch (error) {
+    console.error('Error in saveGroqConfig:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create a Groq client instance for a user
+ * @param userId User ID to create client for
+ * @returns Groq client instance
+ */
+export async function createGroqClient(userId: string): Promise<Groq> {
+  try {
+    const config = await getGroqConfig(userId);
+    
+    return new Groq({
+      apiKey: config.apiKey,
+      dangerouslyAllowBrowser: true
+    });
+  } catch (error) {
+    console.error('Error creating Groq client:', error);
+    throw error;
+  }
+}
