@@ -11,8 +11,8 @@ import ExternalAnalytics from '../components/ExternalAnalytics';
 import AppSettingsManager from '../components/AppSettingsManager';
 import ContactManagement from '../components/ContactManagement';
 import ProfileImageUpload from '../components/ProfileImageUpload';
-import AvatarSupabase from '../components/AvatarSupabase';
 import AppearanceSettings from '../components/AppearanceSettings';
+import WebhookConfig from '../components/WebhookConfig';
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -616,76 +616,7 @@ const Settings = () => {
 
             {activeTab === 'webhook' && (
               <div className="bg-white rounded-xl shadow-sm p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-6">Configuration Webhook</h2>
-                
-                {webhookError && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-                    {webhookError}
-                  </div>
-                )}
-                
-                {webhookSuccess && (
-                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-                    {webhookSuccess}
-                  </div>
-                )}
-                
-                <div className="space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      URL du Webhook
-                    </label>
-                    <input
-                      type="url"
-                      value={webhookConfig.url}
-                      onChange={(e) => setWebhookConfig({ ...webhookConfig, url: e.target.value })}
-                      placeholder="https://your-webhook-url.com/webhook"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                    />
-                    <p className="mt-1 text-sm text-gray-500">
-                      L'URL où les événements WhatsApp seront envoyés
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Token de Vérification
-                    </label>
-                    <input
-                      type="text"
-                      value={webhookConfig.verify_token}
-                      onChange={(e) => setWebhookConfig({ ...webhookConfig, verify_token: e.target.value })}
-                      placeholder="your_verification_token"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
-                    />
-                    <p className="mt-1 text-sm text-gray-500">
-                      Token utilisé pour vérifier les requêtes provenant de Meta
-                    </p>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="is_active"
-                      checked={webhookConfig.is_active}
-                      onChange={(e) => setWebhookConfig({ ...webhookConfig, is_active: e.target.checked })}
-                      className="h-4 w-4 text-yellow-500 focus:ring-yellow-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="is_active" className="text-sm text-gray-700">
-                      Activer le webhook
-                    </label>
-                  </div>
-                  
-                  <div className="pt-4 border-t border-gray-200">
-                    <button
-                      onClick={handleSaveWebhookConfig}
-                      disabled={webhookLoading}
-                      className="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 disabled:opacity-50"
-                    >
-                      {webhookLoading ? 'Enregistrement...' : 'Enregistrer la configuration'}
-                    </button>
-                  </div>
-                </div>
+                <WebhookConfig />
               </div>
             )}
 
