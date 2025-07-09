@@ -184,12 +184,17 @@ app.post('/webhook', async (req: Request, res: Response) => {
       // Return a 200 OK response to acknowledge receipt
       res.status(200).send('EVENT_RECEIVED');
     } else {
-      // Not a WhatsApp Business API event
+      // Not a WhatsApp Business API event 
       console.warn(`Received webhook event for ${req.body.object}`);
       res.sendStatus(404);
     }
   } catch (error) {
-    console.error('Error processing webhook:', error);
+    console.error('Error processing webhook:');
+    if (error instanceof Error) {
+      console.error(error.message);
+    } else {
+      console.error(String(error));
+    }
     res.status(500).send('Error processing webhook');
   }
 });
@@ -224,8 +229,9 @@ async function handleStatusUpdate(phoneNumberId: string, status: any): Promise<v
       return;
     }
     
-    // Construct the endpoint URL for status updates
-    const endpoint = baseUrl ? new URL('/api/whatsapp/status', baseUrl).toString() : null;
+    // Use the Edge Function endpoint directly for status updates
+    // The Edge Function will handle routing based on the request body
+    const endpoint = baseUrl;
     
     if (!endpoint) {
       console.warn('No endpoint available for status updates, skipping');
@@ -234,6 +240,7 @@ async function handleStatusUpdate(phoneNumberId: string, status: any): Promise<v
     
     // Send the status update
     await axios.post(endpoint, {
+      type: 'status_update',
       phoneNumberId,
       messageId,
       recipientId,
@@ -247,7 +254,18 @@ async function handleStatusUpdate(phoneNumberId: string, status: any): Promise<v
     
     console.log(`Status update forwarded successfully`);
   } catch (error) {
-    console.error('Error handling status update:', error);
+    console.error('Error handling status update:');
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+      } else {
+        console.error('Error message:', error.message);
+      }
+    } else if (error instanceof Error) {
+      console.error('Error message:', error.message);
+    } else {
+      console.error('Unknown error:', error);
+    }
   }
 }
 
@@ -300,8 +318,21 @@ async function forwardMessage(
     
     console.log(`Message forwarded successfully: ${response.status}`);
   } catch (error) {
-    console.error(`Error forwarding message:`, error);
-    console.log('Sending auto-response instead');
+    console.error(`Error forwarding message:`);
+    
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      } else {
+        console.error('Error message:', error.message);
+      }
+    } else if (error instanceof Error) {
+      console.error('Error message:', error.message);
+    } else {
+      console.error('Unknown error:', error);
+    }
+    
     await sendAutoResponse(messageData.phoneNumberId, messageData.from, messageData.text, chatbotType);
   }
 }
@@ -362,7 +393,20 @@ async function sendAutoResponse(
     
     console.log(`Auto-response sent successfully: ${response.status}`);
   } catch (error) {
-    console.error(`Error sending auto-response:`, error);
+    console.error(`Error sending auto-response:`);
+    
+    if (axios.isAxiosError(error)) {
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      } else {
+        console.error('Error message:', error.message);
+      }
+    } else if (error instanceof Error) {
+      console.error('Error message:', error.message);
+    } else {
+      console.error('Unknown error:', error);
+    }
   }
 }
 
@@ -398,12 +442,21 @@ app.get('/templates/:businessAccountId', async (req: Request, res: Response) => 
     console.error('Error fetching templates:', error);
     
     if (axios.isAxiosError(error)) {
-      const status = error.response?.status || 500;
-      const errorData = error.response?.data || 'Error fetching templates';
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+        const status = error.response.status || 500;
+        const errorData = error.response.data || { error: 'Error fetching templates' };
+        return res.status(status).json({ error: errorData });
+      }
+      return res.status(500).json({ error: error.message || 'Error fetching templates' });
+    } else if (error instanceof Error) {
+      const status = 500;
+      const errorData = { error: error.message || 'Error fetching templates' };
       return res.status(status).json({ error: errorData });
+    } else {
+      return res.status(500).json({ error: 'Unknown error fetching templates' });
     }
-    
-    res.status(500).json({ error: 'Error fetching templates' });
   }
 });
 

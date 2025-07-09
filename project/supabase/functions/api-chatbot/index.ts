@@ -25,7 +25,70 @@ serve(async (req) => {
     // Get the chatbot type from the URL path
     const url = new URL(req.url);
     const pathParts = url.pathname.split('/');
-    const chatbotType = pathParts[pathParts.length - 1]; // Last part of the path
+    let chatbotType = pathParts[pathParts.length - 1]; // Last part of the path
+    
+    // Parse request body
+    const messageData = await req.json();
+    
+    // Check if this is a status update
+    if (messageData.type === 'status_update') {
+      // Handle status update
+      try {
+        // Get Supabase client
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+        
+        if (!supabaseUrl || !supabaseKey) {
+          throw new Error('Missing Supabase environment variables');
+        }
+        
+        const supabase = createClient(supabaseUrl, supabaseKey);
+        
+        // Update message status in database
+        const { error: updateError } = await supabase
+          .from('message_logs')
+          .update({
+            status: messageData.status,
+            updated_at: new Date().toISOString()
+          })
+          .eq('message_id', messageData.messageId);
+
+        if (updateError) {
+          console.error('Error updating message status:', updateError);
+          throw new Error(`Failed to update message status: ${updateError.message}`);
+        }
+        
+        // Return success response
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: `Status updated to ${messageData.status}`
+          }),
+          { 
+            status: 200,
+            headers: { 
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          }
+        );
+      } catch (error) {
+        console.error('Error handling status update:', error);
+        return new Response(
+          JSON.stringify({ 
+            error: error.message || 'An error occurred',
+            details: error.stack
+          }),
+          { 
+            status: 500,
+            headers: { 
+              'Content-Type': 'application/json',
+              ...corsHeaders
+            }
+          }
+        );
+      }
+    }
 
     if (!['client', 'education', 'quiz'].includes(chatbotType)) {
       return new Response(
@@ -40,23 +103,6 @@ serve(async (req) => {
       );
     }
 
-    // Only allow POST requests
-    if (req.method !== 'POST') {
-      return new Response(
-        JSON.stringify({ error: 'Method not allowed' }),
-        { 
-          status: 405,
-          headers: { 
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        }
-      );
-    }
-
-    // Parse request body
-    const messageData = await req.json();
-    
     // Validate request data
     if (!messageData.from || !messageData.text) {
       return new Response(
