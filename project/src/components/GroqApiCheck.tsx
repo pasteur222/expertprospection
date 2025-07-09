@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Key } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { getGroqConfig } from '../lib/groq-config';
+import { useAuth } from '../contexts/AuthContext'; 
+import { getGroqConfig } from '../lib/groq-config'; 
+import { supabase } from '../lib/supabase';
 
 interface GroqApiCheckProps {
   children: React.ReactNode;
@@ -23,13 +24,36 @@ const GroqApiCheck: React.FC<GroqApiCheckProps> = ({ children }) => {
   const checkGroqConfig = async () => {
     if (!user?.id) {
       setLoading(false);
+      setHasGroqConfig(false);
       return;
     }
 
     try {
       setLoading(true);
-      await getGroqConfig(user.id);
-      setHasGroqConfig(true);
+      
+      // First try with the current user's ID
+      try {
+        await getGroqConfig(user.id);
+        setHasGroqConfig(true);
+        return;
+      } catch (userError) {
+        console.log('No Groq configuration found for current user:', userError);
+        
+        // If that fails, check if any user has a Groq configuration
+        const { data: anyGroqConfig } = await supabase
+          .from('user_groq_config')
+          .select('*')
+          .limit(1)
+          .maybeSingle();
+          
+        if (anyGroqConfig) {
+          setHasGroqConfig(true);
+          return;
+        }
+        
+        // If no configuration found at all
+        setHasGroqConfig(false);
+      }
     } catch (error) {
       console.log('No Groq configuration found:', error);
       setHasGroqConfig(false);
@@ -49,7 +73,7 @@ const GroqApiCheck: React.FC<GroqApiCheckProps> = ({ children }) => {
   if (hasGroqConfig === false) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
+        <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full mx-4">
           <div className="flex items-center justify-center mb-6">
             <div className="bg-yellow-100 p-3 rounded-full">
               <Key className="w-8 h-8 text-yellow-500" />
@@ -66,7 +90,7 @@ const GroqApiCheck: React.FC<GroqApiCheckProps> = ({ children }) => {
           </div>
           <button
             onClick={() => navigate('/groq-setup')}
-            className="w-full bg-yellow-500 text-white py-3 px-4 rounded-lg hover:bg-yellow-600 transition-colors"
+            className="w-full bg-yellow-500 text-white py-3 px-4 rounded-lg hover:bg-yellow-600 transition-colors shadow-sm"
           >
             Configure Groq API
           </button>

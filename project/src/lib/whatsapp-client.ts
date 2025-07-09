@@ -1,6 +1,9 @@
 import { supabase } from './supabase';
 import { checkSubscriptionStatus } from './subscription';
 
+// Define the webhook endpoint for processing messages
+const WEBHOOK_ENDPOINT = 'https://webhook-telecombusiness.onrender.com/webhook';
+
 // Define the WhatsApp API URL
 const WHATSAPP_API_URL = "https://graph.facebook.com/v18.0";
 
@@ -170,7 +173,10 @@ export async function initializeWhatsAppWebhook() {
 
 export async function handleIncomingMessage(message: WhatsAppMessage) {
   try {
-    if (!message.text?.body) return;
+    if (!message.text?.body) {
+      console.warn('Received message without text body');
+      return;
+    }
 
     // Save incoming message
     await supabase.from('customer_conversations').insert({
@@ -179,6 +185,33 @@ export async function handleIncomingMessage(message: WhatsAppMessage) {
       sender: 'user',
       created_at: new Date(message.timestamp).toISOString()
     });
+
+    // Forward message to webhook for processing
+    try {
+      const response = await fetch(WEBHOOK_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          from: message.from,
+          text: message.text.body,
+          timestamp: message.timestamp,
+          messageId: message.id
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error forwarding message to webhook:', errorData);
+        // Continue with fallback processing if webhook fails
+      } else {
+        // Message successfully processed by webhook, no need for fallback
+        return;
+      }
+    } catch (error) {
+      console.error('Error sending message to webhook:', error);
+    }
 
     // Check if this is a trigger message
     const moduleType = getModuleType(message.text.body);

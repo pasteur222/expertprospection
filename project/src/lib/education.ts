@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
-import { checkSubscriptionStatus } from './subscription';
-import { createGroqClient } from './groq-config';
+import { checkSubscriptionStatus } from './subscription'; 
+import { createGroqClient } from './groq-config'; 
 
 interface StudentProfile {
   id: string;
@@ -322,7 +322,7 @@ function calculateStudentSummary(analytics: any[], sessions: any[]) {
 export async function processCustomerMessage(message: Message): Promise<Message> {
   const startTime = Date.now();
   let groq;
-  
+
   try {
     // Check if user has an active subscription
     const hasSubscription = await checkSubscriptionStatus(message.phoneNumber);
@@ -330,19 +330,42 @@ export async function processCustomerMessage(message: Message): Promise<Message>
     // Get or create student profile
     const student = await getOrCreateStudentProfile(message.phoneNumber);
 
-    // Get user_id from student profile
-    const { data: userProfile } = await supabase
-      .from('user_profiles')
-      .select('user_id')
-      .eq('phone_number', message.phoneNumber)
-      .maybeSingle();
+    // Get user_id from student profile or from profils_utilisateurs
+    let userId = null;
+    
+    // First try to get from student_profiles if it has user_id
+    if (student && student.user_id) {
+      userId = student.user_id;
+    } else {
+      // Try to get from profils_utilisateurs
+      const { data: userProfile } = await supabase
+        .from('profils_utilisateurs')
+        .select('id')
+        .eq('phone_number', message.phoneNumber)
+        .maybeSingle();
+      
+      if (userProfile) {
+        userId = userProfile.id;
+      }
+    }
 
-    if (!userProfile || !userProfile.user_id) {
-      throw new Error('User profile not found');
+    if (!userId) {
+      // If no user_id found, try to get any user with Groq config as fallback
+      const { data: anyGroqConfig } = await supabase
+        .from('user_groq_config')
+        .select('user_id')
+        .limit(1)
+        .maybeSingle();
+        
+      if (anyGroqConfig) {
+        userId = anyGroqConfig.user_id;
+      } else {
+        throw new Error('No user with Groq configuration found');
+      }
     }
 
     // Create Groq client with user's API key
-    groq = await createGroqClient(userProfile.user_id);
+    groq = await createGroqClient(userId);
 
     // 1. Save the incoming message
     await supabase

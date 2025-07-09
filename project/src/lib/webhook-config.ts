@@ -69,3 +69,28 @@ export async function updateWebhookUrl(userId: string, webhookUrl: string): Prom
     throw error;
   }
 }
+
+/**
+ * Test webhook connection
+ * @param webhookUrl The webhook URL to test
+ * @returns Whether the connection was successful
+ */
+export async function testWebhookConnection(webhookUrl: string): Promise<boolean> {
+  try {
+    // Simple ping to check if webhook is online
+    const response = await fetch(webhookUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      mode: 'no-cors' // This prevents CORS errors but limits response access
+    });
+    
+    // With no-cors mode, we can't read the response, but if no error is thrown,
+    // it means the request was sent successfully
+    return true;
+  } catch (error) {
+    console.error('Error testing webhook connection:', error);
+    return false;
+  }
+}

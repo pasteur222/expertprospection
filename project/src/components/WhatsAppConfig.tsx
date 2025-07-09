@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { AlertCircle, Save, RefreshCw, X, Settings, MessageSquare, Globe, Shield, Clock, Users, Info } from 'lucide-react';
+import { AlertCircle, Save, RefreshCw, X, Settings, MessageSquare, Globe, Shield, Clock, Users, Info, Webhook } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
+import { supabase } from '../lib/supabase';
+import { initializeWhatsAppWebhook } from '../lib/whatsapp-client';
+import BackButton from '../components/BackButton';
+import WebhookConfigForm from './WebhookConfigForm';
 
 interface WhatsAppConfig {
   id?: string;
@@ -51,7 +50,7 @@ const WhatsAppConfig = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'general' | 'messaging' | 'security' | 'rate-limit'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'messaging' | 'security' | 'rate-limit' | 'webhook'>('general');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -510,6 +509,17 @@ const WhatsAppConfig = () => {
             <Clock className="w-5 h-5 inline-block mr-2" />
             Rate Limiting
           </button>
+          <button
+            onClick={() => setActiveTab('webhook')}
+            className={`px-6 py-3 border-b-2 text-sm font-medium ${
+              activeTab === 'webhook'
+                ? 'border-yellow-500 text-yellow-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <Webhook className="w-5 h-5 inline-block mr-2" />
+            Webhook
+          </button>
         </nav>
       </div>
 
@@ -539,6 +549,10 @@ const WhatsAppConfig = () => {
               You'll need to provide at minimum the Access Token, Phone Number ID, and Webhook URL.
             </p>
           </div>
+        )}
+
+        {activeTab === 'webhook' && (
+          <WebhookConfigForm onSaved={() => setSuccess('Webhook configuration saved successfully')} />
         )}
 
         <form onSubmit={handleSubmit}>
