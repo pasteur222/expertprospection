@@ -48,7 +48,6 @@ const NumberFiltering = () => {
   });
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Gestion de l'import des fichiers
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -70,7 +69,6 @@ const NumberFiltering = () => {
     reader.readAsText(file);
   };
 
-  // Lancer le traitement batch amélioré
   const startProcessing = async () => {
     setIsProcessing(true);
     setProgress(0);
@@ -83,7 +81,7 @@ const NumberFiltering = () => {
     try {
       console.log('🚀 [NUMBER-FILTERING] Starting enhanced validation process');
       
-      const { results, summary } = await batchValidatePhoneNumbers(
+      const { results, summary } = await batchValidateWhatsAppNumbers(
         inputNumbers,
         {
           batchSize: filterSettings.batchSize,
@@ -101,13 +99,18 @@ const NumberFiltering = () => {
       setValidationResults(results);
       setValidationSummary(summary);
       
+      // Generate success message with detailed statistics
       const successMessage = `✅ Validation completed! ${summary.whatsAppValid} valid WhatsApp numbers found out of ${summary.total} processed. Pre-validation: ${summary.preValidationPassed}/${summary.total} passed format checks.`;
       setSuccess(successMessage);
+      
       console.log('✅ [NUMBER-FILTERING] Validation completed:', summary);
       
-      setTimeout(() => setSuccess(null), 5000);
-
-    } catch (error: any) {
+      // Auto-hide success message after 5 seconds
+      setTimeout(() => {
+        setSuccess(null);
+      }, 5000);
+      
+    } catch (error) {
       console.error('❌ [NUMBER-FILTERING] Validation failed:', error);
       setError(`Validation failed: ${error.message}`);
     } finally {
@@ -117,7 +120,6 @@ const NumberFiltering = () => {
     }
   };
 
-  // Export simple TXT des numéros WhatsApp valides
   const exportResults = () => {
     if (validationResults.length === 0) {
       setError('No validation results to export');
@@ -125,12 +127,13 @@ const NumberFiltering = () => {
     }
 
     try {
+      // Export only WhatsApp-valid numbers
       const whatsAppValidNumbers = validationResults
-        .filter(result => result.hasWhatsApp)
+        .filter(result => result.hasWhatsApp === true)
         .map(result => result.phoneNumber)
         .join('\n');
 
-      if (!whatsAppValidNumbers.length) {
+      if (whatsAppValidNumbers.length === 0) {
         setError('No valid WhatsApp numbers found to export');
         return;
       }
@@ -144,17 +147,15 @@ const NumberFiltering = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
-      setSuccess(`Exported ${validationResults.filter(r => r.hasWhatsApp).length} valid WhatsApp numbers`);
+      
+      setSuccess(`Exported ${validationResults.filter(r => r.hasWhatsApp === true).length} valid WhatsApp numbers`);
       setTimeout(() => setSuccess(null), 3000);
-
     } catch (error) {
       console.error('Export error:', error);
       setError('Failed to export results');
     }
   };
 
-  // Export CSV détaillé
   const exportDetailedResults = () => {
     if (validationResults.length === 0) {
       setError('No validation results to export');
@@ -172,7 +173,7 @@ const NumberFiltering = () => {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
+      
       setSuccess('Detailed validation results exported');
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
@@ -192,6 +193,7 @@ const NumberFiltering = () => {
 
   const removeNumber = (index: number) => {
     setInputNumbers(prev => prev.filter((_, i) => i !== index));
+    // Clear results if numbers are modified
     if (validationResults.length > 0) {
       setValidationResults([]);
       setValidationSummary(null);
@@ -199,21 +201,45 @@ const NumberFiltering = () => {
   };
 
   const getStatusIcon = (result: WhatsAppValidationResult) => {
-    if (!result.validationDetails.isValid) return <XCircle className="w-4 h-4 text-red-500" />;
-    if (result.hasWhatsApp) return <CheckCircle className="w-4 h-4 text-green-500" />;
-    return <XCircle className="w-4 h-4 text-orange-500" />;
+    if (!result.validationDetails.isValid) {
+      return <XCircle className="w-4 h-4 text-red-500" />;
+    }
+    
+    if (result.hasWhatsApp === true) {
+      return <CheckCircle className="w-4 h-4 text-green-500" />;
+    } else if (result.hasWhatsApp === false) {
+      return <XCircle className="w-4 h-4 text-orange-500" />;
+    } else {
+      return <AlertCircle className="w-4 h-4 text-yellow-500" />;
+    }
   };
 
   const getStatusText = (result: WhatsAppValidationResult) => {
-    if (!result.validationDetails.isValid) return 'Format Invalid';
-    if (result.hasWhatsApp) return 'WhatsApp ✅';
-    return 'No WhatsApp ❌';
+    if (!result.validationDetails.isValid) {
+      return 'Format Invalid';
+    }
+    
+    if (result.hasWhatsApp === true) {
+      return 'WhatsApp ✅';
+    } else if (result.hasWhatsApp === false) {
+      return 'No WhatsApp ❌';
+    } else {
+      return 'Unknown';
+    }
   };
 
   const getStatusColor = (result: WhatsAppValidationResult) => {
-    if (!result.validationDetails.isValid) return 'bg-red-50 border-red-200 text-red-700';
-    if (result.hasWhatsApp) return 'bg-green-50 border-green-200 text-green-700';
-    return 'bg-orange-50 border-orange-200 text-orange-700';
+    if (!result.validationDetails.isValid) {
+      return 'bg-red-50 border-red-200 text-red-700';
+    }
+    
+    if (result.hasWhatsApp === true) {
+      return 'bg-green-50 border-green-200 text-green-700';
+    } else if (result.hasWhatsApp === false) {
+      return 'bg-orange-50 border-orange-200 text-orange-700';
+    } else {
+      return 'bg-yellow-50 border-yellow-200 text-yellow-700';
+    }
   };
 
   const supportedCountries = getSupportedCountries();
@@ -221,11 +247,817 @@ const NumberFiltering = () => {
   return (
     <div className="p-8">
       <div className="max-w-6xl mx-auto">
-        <BackButton />
+        <div className="mb-6">
+          <BackButton />
+        </div>
+        
         <h1 className="text-2xl font-bold text-gray-900 mb-6">Enhanced WhatsApp Number Filtering</h1>
 
-        {/* Info Panel */}
+        {/* Enhanced Information Panel */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
           <div className="flex items-start gap-3">
             <Info className="w-6 h-6 text-blue-600 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
+              <h3 className="font-medium text-blue-800 mb-2">Enhanced Validation Process</h3>
+              <div className="text-sm text-blue-700 space-y-2">
+                <p><strong>Step 1:</strong> Mandatory country code verification - numbers without valid country codes are immediately rejected</p>
+                <p><strong>Step 2:</strong> Country-specific format validation - length and mobile prefix verification</p>
+                <p><strong>Step 3:</strong> WhatsApp API validation - only for numbers that pass all format checks</p>
+                <p><strong>Supported:</strong> {supportedCountries.length} countries with specific validation rules</p>
+              </div>
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={() => setShowCountryInfo(true)}
+                  className="text-sm text-blue-600 hover:text-blue-800 underline"
+                >
+                  View supported countries
+                </button>
+                {validationResults.length > 0 && (
+                  <button
+                    onClick={() => setShowValidationDetails(true)}
+                    className="text-sm text-blue-600 hover:text-blue-800 underline"
+                  >
+                    View validation details
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Main Upload Section */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Import Phone Numbers</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Upload a file with phone numbers including country codes (e.g., +242, +33, +1)
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                <Settings className="w-4 h-4" />
+                Settings
+              </button>
+              <input
+                type="file"
+                id="file-upload"
+                className="hidden"
+                accept=".txt,.csv"
+                onChange={handleFileUpload}
+                disabled={isProcessing}
+              />
+              <label
+                htmlFor="file-upload"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
+              >
+                <Upload className="w-4 h-4" />
+                Import File
+              </label>
+            </div>
+          </div>
+
+          {/* Settings Panel */}
+          {showSettings && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h3 className="text-md font-medium text-gray-900 mb-4">Validation Settings</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Batch Size
+                  </label>
+                  <input
+                    type="number"
+                    value={filterSettings.batchSize}
+                    onChange={(e) => setFilterSettings({...filterSettings, batchSize: parseInt(e.target.value) || 20})}
+                    min="1"
+                    max="100"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    Numbers processed simultaneously (1-100)
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Delay Between Batches (ms)
+                  </label>
+                  <input
+                    type="number"
+                    value={filterSettings.delayBetweenBatches}
+                    onChange={(e) => setFilterSettings({...filterSettings, delayBetweenBatches: parseInt(e.target.value) || 1000})}
+                    min="500"
+                    max="5000"
+                    step="100"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-sm text-gray-500">
+                    Wait time between batches (500-5000ms)
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Max Retry Attempts
+                  </label>
+                  <input
+                    type="number"
+                    value={filterSettings.maxRetries}
+                    onChange={(e) => setFilterSettings({...filterSettings, maxRetries: parseInt(e.target.value) || 3})}
+                    min="1"
+                    max="10"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Retry attempts for failed API calls (1-10)
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Retry Delay (ms)
+                  </label>
+                  <input
+                    type="number"
+                    value={filterSettings.retryDelay}
+                    onChange={(e) => setFilterSettings({...filterSettings, retryDelay: parseInt(e.target.value) || 2000})}
+                    min="1000"
+                    max="10000"
+                    step="500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  />
+                  <p className="text-sm text-gray-500 mt-1">
+                    Wait time before retry attempts (1000-10000ms)
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="use-cache"
+                    checked={filterSettings.useCache}
+                    onChange={(e) => setFilterSettings({...filterSettings, useCache: e.target.checked})}
+                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="use-cache" className="ml-2 block text-sm text-gray-900">
+                    Use validation cache (recommended)
+                  </label>
+                </div>
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="skip-api"
+                    checked={filterSettings.skipApiValidation}
+                    onChange={(e) => setFilterSettings({...filterSettings, skipApiValidation: e.target.checked})}
+                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="skip-api" className="ml-2 block text-sm text-gray-900">
+                    Skip WhatsApp API validation (format check only)
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error and Success Messages */}
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+              <AlertCircle className="w-5 h-5 flex-shrink-0" />
+              <p>{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700">
+              <CheckCircle className="w-5 h-5 flex-shrink-0" />
+              <p>{success}</p>
+            </div>
+          )}
+
+          {/* Validation Summary */}
+          {validationSummary && (
+            <div className="mb-6 bg-white border border-gray-200 rounded-lg p-6">
+              <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center gap-2">
+                <BarChart2 className="w-5 h-5 text-blue-600" />
+                Validation Summary
+              </h3>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="text-center p-3 bg-blue-50 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{validationSummary.total}</div>
+                  <div className="text-sm text-blue-600">Total Numbers</div>
+                </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{validationSummary.preValidationPassed}</div>
+                  <div className="text-sm text-green-600">Format Valid</div>
+                </div>
+                <div className="text-center p-3 bg-purple-50 rounded-lg">
+                  <div className="text-2xl font-bold text-purple-600">{validationSummary.whatsAppValid}</div>
+                  <div className="text-sm text-purple-600">WhatsApp Valid</div>
+                </div>
+                <div className="text-center p-3 bg-yellow-50 rounded-lg">
+                  <div className="text-2xl font-bold text-yellow-600">{validationSummary.apiCallsMade}</div>
+                  <div className="text-sm text-yellow-600">API Calls Made</div>
+                </div>
+              </div>
+              
+              <div className="flex justify-between items-center">
+                <div className="text-sm text-gray-600">
+                  Pre-validation pass rate: <span className="font-medium">{((validationSummary.preValidationPassed / validationSummary.total) * 100).toFixed(1)}%</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                  WhatsApp valid rate: <span className="font-medium">{validationSummary.whatsAppValidation.validRate.toFixed(1)}%</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Processing Controls */}
+          {inputNumbers.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  {isProcessing ? (
+                    <button
+                      onClick={handleCancel}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                    >
+                      <X className="w-4 h-4" />
+                      Cancel
+                    </button>
+                  ) : (
+                    <button
+                      onClick={startProcessing}
+                      disabled={isProcessing || inputNumbers.length === 0}
+                      className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {isProcessing ? (
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                      ) : (
+                        <Phone className="w-5 h-5" />
+                      )}
+                      {isProcessing ? 'Validating...' : 'Start Enhanced Validation'}
+                    </button>
+                  )}
+                  {isProcessing && (
+                    <div className="flex items-center gap-2">
+                      <div className="h-2 w-32 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-red-600 transition-all duration-300"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <span className="text-sm text-gray-600">{progress}%</span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-sm text-gray-500">
+                    {inputNumbers.length} number(s) loaded
+                  </div>
+                  {validationResults.length > 0 && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={exportResults}
+                        className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                      >
+                        <Download className="w-4 h-4" />
+                        Export Valid Numbers
+                      </button>
+                      <button
+                        onClick={exportDetailedResults}
+                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Export Detailed Report
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Results Display */}
+          {validationResults.length > 0 ? (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-gray-900">Validation Results</h3>
+                  <div className="text-sm text-gray-500">
+                    {validationResults.filter(r => r.hasWhatsApp === true).length} valid WhatsApp numbers found
+                  </div>
+                </div>
+              </div>
+              <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+                {validationResults.map((result, index) => (
+                  <div key={index} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3 flex-1">
+                        {getStatusIcon(result)}
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900">
+                              {formatPhoneNumberForDisplay(result.phoneNumber)}
+                            </span>
+                            {result.validationDetails.countryName && (
+                              <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                                {result.validationDetails.countryName}
+                              </span>
+                            )}
+                          </div>
+                          {result.error && (
+                            <p className="text-sm text-red-600 mt-1">{result.error}</p>
+                          )}
+                          {result.validationDetails.errors.length > 0 && (
+                            <p className="text-sm text-red-600 mt-1">
+                              {result.validationDetails.errors.join(', ')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(result)}`}>
+                          {getStatusText(result)}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {result.source.toUpperCase()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : inputNumbers.length > 0 ? (
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                <h3 className="text-sm font-medium text-gray-900">Imported Numbers (Not Yet Validated)</h3>
+              </div>
+              <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+                {inputNumbers.map((number, index) => (
+                  <div key={index} className="p-4 hover:bg-gray-50">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-900">{number}</span>
+                      <button
+                        onClick={() => removeNumber(index)}
+                        className="p-1 text-gray-400 hover:text-red-500"
+                        disabled={isProcessing}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              <Phone className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p>Import a file to start enhanced validation</p>
+              <p className="text-sm mt-2">Supported formats: .txt, .csv with country codes</p>
+            </div>
+          )}
+        </div>
+
+        {/* Enhanced How It Works Section */}
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-6">Enhanced Validation Process</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="text-center">
+              <div className="bg-blue-100 p-3 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Globe className="w-8 h-8 text-blue-600" />
+              </div>
+              <h3 className="font-medium text-gray-900 mb-2">1. Country Code Check</h3>
+              <p className="text-sm text-gray-600">
+                Mandatory verification that all numbers include valid country codes (+242, +33, +1, etc.)
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="bg-green-100 p-3 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <MapPin className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="font-medium text-gray-900 mb-2">2. Format Validation</h3>
+              <p className="text-sm text-gray-600">
+                Country-specific length and mobile prefix validation for {supportedCountries.length} supported countries
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="bg-purple-100 p-3 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Phone className="w-8 h-8 text-purple-600" />
+              </div>
+              <h3 className="font-medium text-gray-900 mb-2">3. WhatsApp API Check</h3>
+              <p className="text-sm text-gray-600">
+                Official WhatsApp API validation only for numbers that pass all format checks
+              </p>
+            </div>
+            
+            <div className="text-center">
+              <div className="bg-yellow-100 p-3 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Download className="w-8 h-8 text-yellow-600" />
+              </div>
+              <h3 className="font-medium text-gray-900 mb-2">4. Export Results</h3>
+              <p className="text-sm text-gray-600">
+                Export validated WhatsApp numbers or detailed validation reports with error analysis
+              </p>
+            </div>
+          </div>
+        </div>
+      }
+
+      // Show completion statistics
+      console.log(`Filtering completed: ${validCount} valid numbers found out of ${totalNumbers} (${retryCount} retries needed)`);
+      
+    } catch (error) {
+      console.error('Error during processing:', error);
+      setError(error.message || 'An error occurred during processing');
+    } finally {
+      setIsProcessing(false);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const exportResults = () => {
+    const whatsAppNumbers = numbers
+      .filter(n => n.hasWhatsApp)
+      .map(n => n.normalizedNumber || n.number)
+      .join('\n');
+
+    const blob = new Blob([whatsAppNumbers], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'numeros_whatsapp.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const removeNumber = (index: number) => {
+    setNumbers(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleCancel = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsProcessing(false);
+  };
+
+  const getStatusColor = (status: PhoneNumber['status']) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-gray-100';
+      case 'checking':
+        return 'bg-blue-100';
+      case 'done':
+        return 'bg-green-100';
+      case 'error':
+        return 'bg-red-100';
+      default:
+        return 'bg-gray-100';
+    }
+  };
+
+  const getStatusText = (number: PhoneNumber) => {
+    switch (number.status) {
+      case 'pending':
+        return 'En attente';
+      case 'checking':
+        return 'Vérification...';
+      case 'done':
+        return number.hasWhatsApp ? 'WhatsApp ✅' : 'Pas de WhatsApp ❌';
+      case 'error':
+        return number.error || 'Erreur';
+      default:
+        return 'Inconnu';
+    }
+  };
+
+  return (
+    <div className="p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-6">
+          <BackButton />
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-6">Filtrage des numéros WhatsApp</h1>
+
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Importer des numéros</h2>
+              <p className="text-sm text-gray-500 mt-1">
+                Importez un fichier texte contenant un numéro de téléphone par ligne
+              </p>
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={() => setShowSettings(!showSettings)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+              >
+                <Settings className="w-4 h-4" />
+                Paramètres
+              </button>
+              <input
+                type="file"
+                id="file-upload"
+                className="hidden"
+                accept=".txt,.csv"
+                onChange={handleFileUpload}
+                disabled={isProcessing}
+              />
+              <label
+                htmlFor="file-upload"
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer"
+              >
+                <Upload className="w-4 h-4" />
+                Importer
+              </label>
+              {numbers.length > 0 && (
+                <button
+                  onClick={exportResults}
+                  disabled={isProcessing || !numbers.some(n => n.hasWhatsApp)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Download className="w-4 h-4" />
+                  Exporter les numéros WhatsApp
+                </button>
+              )}
+            </div>
+          </div>
+
+          {showSettings && (
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <h3 className="text-md font-medium text-gray-900 mb-4">Paramètres de filtrage</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Taille des lots
+                  </label>
+                  <input
+                    type="number"
+                    value={filterSettings.batchSize}
+                    onChange={(e) => setFilterSettings({...filterSettings, batchSize: parseInt(e.target.value) || 20})}
+                    min="1"
+                    max="100"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Nombre de numéros traités simultanément (1-100)
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Délai entre les lots (ms)
+                  </label>
+                  <input
+                    type="number"
+                    value={filterSettings.delayBetweenBatches}
+                    onChange={(e) => setFilterSettings({...filterSettings, delayBetweenBatches: parseInt(e.target.value) || 1000})}
+                    min="500"
+                    max="5000"
+                    step="100"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Temps d'attente entre chaque lot (500-5000ms)
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Nombre max de tentatives
+                  </label>
+                  <input
+                    type="number"
+                    value={filterSettings.maxRetries}
+                    onChange={(e) => setFilterSettings({...filterSettings, maxRetries: parseInt(e.target.value) || 3})}
+                    min="1"
+                    max="10"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Nombre de tentatives en cas d'échec (1-10)
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Délai entre tentatives (ms)
+                  </label>
+                  <input
+                    type="number"
+                    value={filterSettings.retryDelay}
+                    onChange={(e) => setFilterSettings({...filterSettings, retryDelay: parseInt(e.target.value) || 2000})}
+                    min="1000"
+                    max="10000"
+                    step="500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Temps d'attente avant nouvelle tentative (1000-10000ms)
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="use-meta-api"
+                    checked={filterSettings.useMetaApi}
+                    onChange={(e) => setFilterSettings({...filterSettings, useMetaApi: e.target.checked})}
+                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="use-meta-api" className="ml-2 block text-sm text-gray-900">
+                    Utiliser l'API Meta (recommandé pour une précision de 99%)
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-gray-500 ml-6">
+                  Désactivez cette option pour utiliser la méthode de simulation (plus rapide mais moins précise)
+                </p>
+              </div>
+            </div>
+          )}
+
+          {numbers.length > 0 && (
+            <div>
+              <div className="mb-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    {isProcessing ? (
+                      <button
+                        onClick={handleCancel}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                        Annuler
+                      </button>
+                    ) : (
+                      <button
+                        onClick={startProcessing}
+                        disabled={isProcessing || numbers.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isProcessing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Phone className="w-4 h-4" />
+                        )}
+                        {isProcessing ? 'Vérification en cours...' : 'Démarrer la vérification'}
+                      </button>
+                    )}
+                    {isProcessing && (
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-32 bg-gray-200 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-red-600 transition-all duration-300"
+                            style={{ width: `${progress}%` }}
+                          />
+                        </div>
+                        <span className="text-sm text-gray-600">{progress}%</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    {validatedCount}/{numbers.length} vérifiés • {totalValidNumbers} numéros WhatsApp trouvés
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                  <p>{error}</p>
+                </div>
+              )}
+
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="grid grid-cols-[1fr,auto] gap-4 p-3 bg-gray-50 border-b border-gray-200 font-medium text-sm text-gray-700">
+                  <div>Numéro</div>
+                  <div>Statut</div>
+                </div>
+                <div className="divide-y divide-gray-200 max-h-96 overflow-y-auto">
+                  {numbers.map((number, index) => (
+                    <div
+                      key={index}
+                      className="grid grid-cols-[1fr,auto] gap-4 p-3 items-center hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => removeNumber(index)}
+                          className="p-1 text-gray-400 hover:text-red-500"
+                          disabled={isProcessing}
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <span>{number.normalizedNumber || number.number}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {number.status === 'checking' ? (
+                          <div className="flex items-center gap-2 px-3 py-1 rounded-full text-sm bg-blue-100 text-blue-800">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            Vérification...
+                          </div>
+                        ) : number.status === 'done' ? (
+                          number.hasWhatsApp ? (
+                            <div className="flex items-center gap-2 px-3 py-1 rounded-full text-sm bg-green-100 text-green-800">
+                              <CheckCircle className="w-3 h-3" />
+                              WhatsApp
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 px-3 py-1 rounded-full text-sm bg-red-100 text-red-800">
+                              <XCircle className="w-3 h-3" />
+                              Pas de WhatsApp
+                            </div>
+                          )
+                        ) : number.status === 'error' ? (
+                          <div className="flex items-center gap-2 px-3 py-1 rounded-full text-sm bg-red-100 text-red-800">
+                            <AlertCircle className="w-3 h-3" />
+                            {number.error || 'Erreur'}
+                          </div>
+                        ) : (
+                          <span className={`px-3 py-1 rounded-full text-sm ${getStatusColor(number.status)}`}>
+                            {getStatusText(number)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {numbers.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              <Phone className="w-12 h-12 mx-auto mb-4 text-gray-400" />
+              <p>Importez un fichier pour commencer la vérification</p>
+              <p className="text-sm mt-2">Formats acceptés : .txt, .csv</p>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Comment ça marche</h2>
+          <div className="space-y-4 text-gray-600">
+            <div className="flex items-start gap-3">
+              <div className="bg-blue-100 p-2 rounded-full">
+                <Upload className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900">1. Importez vos numéros</h3>
+                <p className="text-sm">Importez un fichier .txt ou .csv contenant un numéro de téléphone par ligne.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <div className="bg-green-100 p-2 rounded-full">
+                <Filter className="w-5 h-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900">2. Configurez les paramètres</h3>
+                <p className="text-sm">Ajustez les paramètres de filtrage pour optimiser la précision et la vitesse.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <div className="bg-purple-100 p-2 rounded-full">
+                <Phone className="w-5 h-5 text-purple-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900">3. Vérification des numéros</h3>
+                <p className="text-sm">Notre système vérifie automatiquement quels numéros sont actifs sur WhatsApp avec une précision de 99% en utilisant l'API Meta.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <div className="bg-yellow-100 p-2 rounded-full">
+                <Clock className="w-5 h-5 text-yellow-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900">4. Traitement par lots</h3>
+                <p className="text-sm">Les numéros sont traités par lots pour optimiser la vitesse et respecter les limites de l'API.</p>
+              </div>
+            </div>
+            
+            <div className="flex items-start gap-3">
+              <div className="bg-red-100 p-2 rounded-full">
+                <Download className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-medium text-gray-900">5. Exportez les résultats</h3>
+                <p className="text-sm">Une fois la vérification terminée, exportez uniquement les numéros valides sur WhatsApp au format CSV.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default NumberFiltering;
