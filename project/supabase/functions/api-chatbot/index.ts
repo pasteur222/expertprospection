@@ -45,7 +45,8 @@ interface AutoReplyRule {
 
 serve(async (req: Request): Promise<Response> => {
   const startTime = Date.now();
-  
+  let requestData: ChatbotRequest | undefined;
+
   // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -61,13 +62,13 @@ serve(async (req: Request): Promise<Response> => {
     if (req.method !== 'POST') {
       console.error('❌ [API-CHATBOT] Method not allowed:', req.method);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Method not allowed. Use POST.' 
+        JSON.stringify({
+          success: false,
+          error: 'Method not allowed. Use POST.'
         }),
-        { 
+        {
           status: 405,
-          headers: { 
+          headers: {
             'Content-Type': 'application/json',
             ...corsHeaders
           }
@@ -76,7 +77,6 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // Parse and validate request body
-    let requestData: ChatbotRequest;
     try {
       requestData = await req.json();
       console.log('🤖 [API-CHATBOT] Request data received:', {
@@ -181,6 +181,23 @@ serve(async (req: Request): Promise<Response> => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Convert timestamp to ISO format if provided as Unix timestamp
+    let formattedTimestamp: string;
+    if (requestData.timestamp) {
+      // Check if timestamp is a number (Unix timestamp) or already ISO string
+      const timestampValue = requestData.timestamp;
+      if (typeof timestampValue === 'number' || /^\d+$/.test(timestampValue)) {
+        // Unix timestamp - convert to ISO
+        formattedTimestamp = new Date(Number(timestampValue) * 1000).toISOString();
+        console.log('🕒 [API-CHATBOT] Converted Unix timestamp to ISO:', formattedTimestamp);
+      } else {
+        // Already ISO format
+        formattedTimestamp = timestampValue;
+      }
+    } else {
+      formattedTimestamp = new Date().toISOString();
+    }
+
     // Save incoming message to database with EXPLICIT source preservation
     console.log('💾 [API-CHATBOT] Saving incoming message with source:', requestData.source);
     const { data: savedMessage, error: saveError } = await supabase
@@ -194,7 +211,7 @@ serve(async (req: Request): Promise<Response> => {
         sender: 'user',
         intent: 'client', // Will be updated based on chatbot routing
         user_agent: requestData.userAgent,
-        created_at: requestData.timestamp || new Date().toISOString()
+        created_at: formattedTimestamp
       })
       .select('id')
       .single();
@@ -339,16 +356,20 @@ serve(async (req: Request): Promise<Response> => {
     );
 
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
     console.error('❌ [API-CHATBOT] Critical error:', {
-      message: error.message,
-      stack: error.stack,
-      source: requestData?.source || 'unknown'
+      message: errorMessage,
+      stack: errorStack,
+      source: requestData?.source || 'unknown',
+      hasRequestData: !!requestData
     });
-    
+
     // Return error response with source preservation
     const errorResponse: ChatbotResponse = {
       success: false,
-      error: error.message || 'An unexpected error occurred',
+      error: errorMessage,
       sessionId: requestData?.sessionId,
       source: requestData?.source, // PRESERVE SOURCE EVEN IN ERROR
       chatbotType: 'client'
@@ -356,9 +377,9 @@ serve(async (req: Request): Promise<Response> => {
 
     return new Response(
       JSON.stringify(errorResponse),
-      { 
+      {
         status: 500,
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
           ...corsHeaders
         }
