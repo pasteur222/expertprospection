@@ -6,4 +6,7 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  preview: {
+    allowedHosts: ['airtelgptsaasprospector.onrender.com'],
+  },
 });
